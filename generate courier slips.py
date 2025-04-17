@@ -6,7 +6,7 @@ from bidi.algorithm import get_display
 def reshape_text(text):
     """
     Reshapes and reorders Arabic/Urdu text for correct display in PDFs.
-    Only needed if your data includes Urdu. 
+    Only needed if your data includes Urdu.
     """
     reshaped = arabic_reshaper.reshape(text)
     return get_display(reshaped)
@@ -25,44 +25,57 @@ class LabelPDF(FPDF):
 def draw_label(pdf, student, label_index, label_height, margin_left):
     """
     Draw a receipt/label for a student. 
-    This version excludes the 'From:' section and any organization heading.
+    This version excludes the 'From:' section and any organization heading,
+    and uses multi_cell() for the address to wrap text automatically.
     """
-    spacing = 5  # spacing between labels in mm
-    y_position = 10 + label_index * (label_height + spacing)
-    x_position = margin_left
-    label_width = 210 - 20  # Using 10 mm left/right margins
+    spacing     = 5
+    y_position  = 10 + label_index * (label_height + spacing)
+    x_position  = margin_left
+    label_width = 210 - 20  # 10 mm margins on left+right
 
-    # Optionally draw a border around each label
+    # 1) Draw the box
     pdf.rect(x_position, y_position, label_width, label_height)
 
-    # Set the cursor position with a small inset from the border
+    # 2) Temporarily disable auto page‐breaks while we fill this box
+    old_auto, old_margin = pdf.auto_page_break, pdf.b_margin
+    pdf.set_auto_page_break(False, 0)
+
+    # 3) Move inside the box
     pdf.set_xy(x_position, y_position + 5)
 
-    # "To:" section for the student details
+    # ---- "To:" ----
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "To:", ln=1)
+    pdf.set_x(x_position + 5)
+    pdf.cell(label_width - 10, 8, "To:", ln=1)
+
+    # ---- Name ----
     pdf.set_font("NotoNastaliq", "", 10)
-    pdf.cell(0, 6, f"Name: {reshape_text(student['Name'])}", ln=1)
-    pdf.cell(0, 6, f"Address: {reshape_text(student['Address'])}", ln=1)
-    pdf.cell(0, 6, f"Mobile: {student['Mobile']}", ln=1)
-    
-    pdf.ln(4)
-    pdf.set_font("NotoNastaliq", "", 12)
-    pdf.multi_cell(
-        label_width - 10,  # width with some padding
-        5, 
-        reshape_text("درسِ نظامی میں شاندار کامیابی پر دل کی گہرائیوں سے مبارک باد! اسے تحفے کے طور پر قبول فرمائیں۔ شکریہ!"),
-        border=0
-    )
+    pdf.set_x(x_position + 5)
+    pdf.cell(label_width - 10, 6, f"Name: {reshape_text(student['Name'])}", ln=1)
+
+    # ---- Address (auto‐wrapping) ----
+    address_txt = f"Address: {reshape_text(student['Address'])}"
+    pdf.set_x(x_position + 5)
+    pdf.multi_cell(label_width - 10, 6, address_txt, border=0)
+
+    # ---- Mobile ----
+    pdf.set_x(x_position + 5)
+    pdf.cell(label_width - 10, 6, f"Mobile: {student['Mobile']}", ln=1)
+
+    # ---- Congratulations message (auto‐wrapping) ----
+    msg = "درسِ نظامی میں شاندار کامیابی پر دل کی گہرائیوں سے مبارک باد! اسے تحفے کے طور پر قبول فرمائیں۔ شکریہ!"
+    pdf.set_x(x_position + 5)
+    pdf.multi_cell(label_width - 10, 5, reshape_text(msg), border=0, align="R")
+
+    # 4) Restore auto page‐break behavior
+    pdf.set_auto_page_break(old_auto, old_margin)
 
 def main():
     # Create the PDF: A4, portrait, measuring in mm
     pdf = LabelPDF(orientation="P", unit="mm", format="A4")
     
     # Register Unicode fonts; ensure these TTF files are in your project directory.
-    # pdf.add_font('NotoNastaliq', '', 'NotoNastaliqSans.ttf', uni=True)
-    # pdf.add_font('NotoNastaliq', 'B', 'NotoNastaliqSans-Bold.ttf', uni=True)
-    pdf.add_font('NotoNastaliq',"", "NotoNaskhArabic-VariableFont_wght.ttf", uni=True)  
+    pdf.add_font('NotoNastaliq', "", "NotoNaskhArabic-VariableFont_wght.ttf", uni=True)  
     
     # Set the number of labels per page (you can adjust this as needed)
     labels_per_page = 5
@@ -75,7 +88,7 @@ def main():
     available_height = 297 - margin_top - margin_bottom - (labels_per_page - 1) * spacing
     label_height = available_height / labels_per_page
 
-    with open("Karachi Only.csv", newline="", encoding="utf-8") as csvfile:
+    with open("Sheet6.csv", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
         label_count = 0
         for student in reader:
@@ -86,8 +99,8 @@ def main():
             draw_label(pdf, student, position, label_height, margin_left)
             label_count += 1
 
-    pdf.output("Karachi Only.pdf")
-    print("PDF generated successfully as 'Karachi Only.pdf'.")
+    pdf.output("Sheet6.pdf")
+    print("PDF generated successfully as 'Sheet6.pdf'.")
 
 if __name__ == '__main__':
     main()
